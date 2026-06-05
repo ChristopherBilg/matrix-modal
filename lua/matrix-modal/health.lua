@@ -21,7 +21,7 @@ function M.check()
   end
 
   -- Environment --------------------------------------------------------------
-  h.start("matrix-modal.nvim: environment")
+  h.start("matrix-modal: environment")
 
   if vim.fn.has("nvim-0.10") == 1 then
     h.ok("Neovim >= 0.10")
@@ -42,7 +42,7 @@ function M.check()
   end
 
   -- Plugin wiring ------------------------------------------------------------
-  h.start("matrix-modal.nvim: plugin")
+  h.start("matrix-modal: plugin")
 
   if vim.g.loaded_matrix_modal then
     h.ok("plugin/matrix-modal.lua has loaded")
@@ -59,7 +59,7 @@ function M.check()
   end
 
   -- Module integrity ---------------------------------------------------------
-  h.start("matrix-modal.nvim: module")
+  h.start("matrix-modal: module")
 
   local ok_mod, mod = pcall(require, "matrix-modal")
   if not ok_mod or type(mod) ~= "table" then
@@ -81,7 +81,7 @@ function M.check()
   end
 
   -- Configuration ------------------------------------------------------------
-  h.start("matrix-modal.nvim: configuration")
+  h.start("matrix-modal: configuration")
 
   local ok_grp, autocmds = pcall(vim.api.nvim_get_autocmds, { group = "MatrixModalHighlights" })
   local setup_called = ok_grp and #autocmds > 0
@@ -165,7 +165,7 @@ function M.check()
   end
 
   -- Highlights ---------------------------------------------------------------
-  h.start("matrix-modal.nvim: highlights")
+  h.start("matrix-modal: highlights")
 
   local hint = setup_called and "" or " (call setup())"
   for _, name in ipairs(BASE_HL) do
