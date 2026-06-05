@@ -1,0 +1,8 @@
+*matrix-modal* Matrix "digital rain" effect in a floating window for Neovim
+
+MIT License Copyright (c) 2026 Christopher R. Bilger
+
+------------------------------------------------------------------------------
+                                                                *MatrixModal*
+TODO:
+- Fill in documentation
