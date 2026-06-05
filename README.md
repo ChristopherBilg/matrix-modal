@@ -21,9 +21,7 @@ Local plugin (as used in this config) with [lazy.nvim](https://github.com/folke/
 
 ```lua
 {
-  "matrix-modal.nvim",
-  dir = vim.fn.stdpath("config") .. "/custom/matrix-modal.nvim",
-  main = "matrix-modal",
+  "Christopherbilg/matrix-modal.nvim",
   cmd = { "Matrix", "MatrixStop", "MatrixToggle", "MatrixSay" },
   opts = {
     theme = "matrix",
