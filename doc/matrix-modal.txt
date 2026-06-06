@@ -1,8 +1,321 @@
-*matrix-modal* Matrix "digital rain" effect in a floating window for Neovim
+*matrix-modal.txt*  A Matrix "digital rain" effect in a floating window
 
-MIT License Copyright (c) 2026 Christopher R. Bilger
+MIT License  Copyright (c) 2026 Christopher R. Bilger
 
-------------------------------------------------------------------------------
-                                                                *MatrixModal*
-TODO:
-- Fill in documentation
+==============================================================================
+CONTENTS                                               *matrix-modal-contents*
+
+    1.  Introduction ..............................|matrix-modal-introduction|
+    2.  Requirements ..............................|matrix-modal-requirements|
+    3.  Installation ..............................|matrix-modal-installation|
+    4.  Usage ............................................|matrix-modal-usage|
+    5.  Commands ......................................|matrix-modal-commands|
+    6.  Configuration ............................|matrix-modal-configuration|
+    7.  Themes ..........................................|matrix-modal-themes|
+    8.  Character sets ................................|matrix-modal-charsets|
+    9.  Lua API ............................................|matrix-modal-api|
+    10. Highlights ..................................|matrix-modal-highlights|
+    11. Health ..........................................|matrix-modal-health|
+    12. Notes ............................................|matrix-modal-notes|
+
+==============================================================================
+1. Introduction                     *matrix-modal* *matrix-modal-introduction*
+
+matrix-modal renders a "digital rain" effect — bright falling characters
+with a fading trail — inside a centered floating window. It also provides a
+decryption mode that scrambles, then locks arbitrary text into place out of
+the rain, optionally rendered as large block letters.
+
+Features:
+
+  - Falling-character rain with a bright head and a configurable trail.
+  - A decryption mode (|:MatrixSay|) that scrambles, then locks text in
+    place.
+  - An optional block-font mode that reveals text as large 5x7 letters.
+  - Six built-in |matrix-modal-themes| and four |matrix-modal-charsets|,
+    plus full color and charset overrides.
+  - A centered floating window that tracks terminal resizes.
+  - Single-instance: repeated opens are no-ops; `q`, `<Esc>`, or
+    |:MatrixStop| closes it.
+  - A |health| integration: `:checkhealth matrix-modal`.
+
+==============================================================================
+2. Requirements                                    *matrix-modal-requirements*
+
+  - Neovim >= 0.10
+
+matrix-modal uses |vim.uv| for its animation timer and the modern highlight
+API (|nvim_set_hl()|). Earlier versions are unsupported; |:checkhealth| will
+report this.
+
+==============================================================================
+3. Installation                                    *matrix-modal-installation*
+
+Install with your plugin manager of choice. With lazy.nvim
+(https://github.com/folke/lazy.nvim): >lua
+    {
+      "Christopherbilg/matrix-modal",
+      cmd = { "Matrix", "MatrixStop", "MatrixToggle", "MatrixSay" },
+      opts = {
+        theme = "matrix",
+        speed = 100,
+        density = 0.01,
+      },
+    }
+<
+Providing `opts` makes lazy.nvim call |matrix-modal.setup()| automatically.
+Calling `setup()` is optional; sensible defaults apply without it. See
+|matrix-modal-configuration|.
+
+==============================================================================
+4. Usage                                                  *matrix-modal-usage*
+
+Open the rain: >vim
+    :Matrix
+<
+Reveal a message out of the rain: >vim
+    :MatrixSay Wake up, Neo.
+<
+Close the modal with `q`, `<Esc>`, or |:MatrixStop|. Everything is also
+available from Lua; see |matrix-modal-api|.
+
+==============================================================================
+5. Commands                                            *matrix-modal-commands*
+
+                                                                     *:Matrix*
+:Matrix                 Open the digital-rain modal. Does nothing if a modal
+                        is already open (matrix-modal is single-instance).
+
+                                                                 *:MatrixStop*
+:MatrixStop             Close the modal if one is open.
+
+                                                               *:MatrixToggle*
+:MatrixToggle           Open the modal if none is open, otherwise close it.
+
+                                                                  *:MatrixSay*
+:MatrixSay {text}       Open the modal and decrypt {text} out of the rain,
+                        closing any modal already open first. The literal
+                        two-character sequence "\n" in {text} becomes a
+                        newline, so a multi-line message fits on one command
+                        line: >vim
+                            :MatrixSay LINE ONE\nLINE TWO
+<
+                        {text} is rendered with the configured `font`; see
+                        |matrix-modal.say()| for per-call overrides.
+
+Inside the modal these normal-mode mappings are buffer-local:
+
+    q          Close the modal.
+    <Esc>      Close the modal.
+
+==============================================================================
+6. Configuration                                  *matrix-modal-configuration*
+
+                                                        *matrix-modal.setup()*
+matrix-modal.setup({opts})
+
+Configure the plugin. Optional — defaults apply if it is never called.
+Calling it merges {opts} over the selected theme and the built-in defaults,
+resolves the active character set, defines the |matrix-modal-highlights|, and
+installs a |ColorScheme| autocommand so those highlights survive a
+`:colorscheme` switch.
+
+{opts} is a table with any of the following fields:
+
+theme ~
+        Type: `string`  Default: `"matrix"`
+        Named color/charset bundle. One of |matrix-modal-themes|. An
+        unknown name falls back to "matrix" with a warning.
+
+chars ~
+        Type: `string|string[]`  Default: `theme default`
+        The pool of characters the rain is drawn from: the name of a
+        built-in set (|matrix-modal-charsets|), a raw string whose
+        characters become the pool (`chars = "01アイウ"`), or an array of
+        single characters. Omit to use the theme default.
+
+speed ~
+        Type: `integer`  Default: `50`
+        Milliseconds between animation frames. Lower is faster.
+
+density ~
+        Type: `number`  Default: `0.03`
+        Probability, per column per frame, of spawning a new stream.
+        Expected range 0.0 to 1.0.
+
+color ~
+        Type: `string`  Default: `theme color`
+        Hex color (e.g. `"#00FF41"`) for the bright head of each stream
+        and for revealed text. Overrides the theme color.
+
+fade_colors ~
+        Type: `string[]`  Default: `theme gradient`
+        Hex colors for the trailing characters, brightest first. The
+        number of entries sets the length of the visible trail.
+
+width ~
+        Type: `number`  Default: `0.85`
+        Window width. A fraction (< 1) is taken of |'columns'|; a value
+        >= 1 is an absolute cell count, capped at the editor width.
+
+height ~
+        Type: `number`  Default: `0.85`
+        Window height. A fraction (< 1) is taken of |'lines'|; a value
+        >= 1 is an absolute cell count, capped at the editor height.
+
+reveal_duration ~
+        Type: `integer`  Default: `2000`
+        Milliseconds for a |:MatrixSay| message to fully resolve from
+        scramble to solid text.
+
+hold_duration ~
+        Type: `integer|nil`  Default: `nil`
+        Milliseconds to hold a fully revealed message before the modal
+        auto-closes. `nil` keeps it open until dismissed.
+
+text_padding ~
+        Type: `integer`  Default: `1`
+        Cells of rain-free margin kept around revealed text, so the rain
+        appears to fall behind the message. `0` disables the margin.
+
+font ~
+        Type: `"normal"|"block"`  Default: `"block"`
+        How |:MatrixSay| renders text. `"block"` draws large 5x7 block
+        letters from an embedded bitmap font; `"normal"` draws text at
+        its natural size. See |matrix-modal-notes|.
+
+==============================================================================
+7. Themes                                                *matrix-modal-themes*
+
+A theme bundles a head `color`, a `fade_colors` gradient, and a default
+`chars` set. Select one with the `theme` option; override any of its parts
+with the individual options in |matrix-modal-configuration|.
+
+    Theme              Head color   Default charset ~
+    matrix (default)   #00FF41      katakana
+    terminal-green     #33FF33      ascii
+    amber              #FFB000      ascii
+    magenta            #FF00FF      ascii
+    neon-blue          #00CCFF      ascii
+    monochrome         #FFFFFF      ascii
+
+==============================================================================
+8. Character sets                                      *matrix-modal-charsets*
+
+Built-in sets selectable by name via the `chars` option:
+
+    ascii       Letters, digits, and a handful of symbols.
+    katakana    Half-width katakana (the classic Matrix look).
+    binary      `0` and `1`.
+    hex         `0`-`9` and `A`-`F`.
+
+`chars` also accepts a raw string or an array of single characters for a
+custom pool. See |matrix-modal-configuration|.
+
+==============================================================================
+9. Lua API                                                  *matrix-modal-api*
+
+All functions live on the module returned by `require("matrix-modal")`.
+|matrix-modal.setup()| is documented under |matrix-modal-configuration|.
+
+                                                        *matrix-modal.start()*
+matrix-modal.start()
+        Open the rain modal. No-op if a modal is already open.
+
+                                                         *matrix-modal.stop()*
+matrix-modal.stop()
+        Close the modal and tear down its timer and autocommands. Safe to
+        call when nothing is open.
+
+                                                       *matrix-modal.toggle()*
+matrix-modal.toggle()
+        Close the modal if one is open, otherwise open the rain.
+
+                                                          *matrix-modal.say()*
+matrix-modal.say({text} [, {opts}])
+        Open the modal and decrypt {text} out of the rain, closing any modal
+        already open first. {text} may contain newlines for multiple lines.
+
+        {opts} is an optional table overriding configuration for this call:
+            reveal_duration  (integer)            ms to fully resolve {text}.
+            hold_duration    (integer)            ms to hold, then close.
+            font             ("normal"|"block")   render style for {text}.
+
+        Examples: >lua
+            local mm = require("matrix-modal")
+            mm.say("Wake up, Neo.", { reveal_duration = 3000 })
+            mm.say("NEO", { font = "block" })
+<
+                                                    *matrix-modal.get_theme()*
+matrix-modal.get_theme()
+        Return the active theme name as a string.
+
+                                                  *matrix-modal.health_info()*
+matrix-modal.health_info()
+        Return a read-only snapshot table of the resolved configuration and
+        the available themes and charsets. Used by |matrix-modal-health|;
+        useful for debugging. Never mutates state.
+
+==============================================================================
+10. Highlights                                       *matrix-modal-highlights*
+
+|matrix-modal.setup()| defines these highlight groups from the active theme
+and re-applies them on |ColorScheme|. Override them after `setup()` (or in a
+|ColorScheme| autocommand) to customize colors beyond the theme options.
+
+MatrixModalBase ~
+        Base text of the rain (the dim body of each stream) and the float
+        background. Foreground is the theme `color`. The window links
+        |hl-NormalFloat| to this group via |'winhighlight'|.
+
+MatrixDecryptText ~
+        Revealed |:MatrixSay| text. Foreground is the theme `color`.
+
+MatrixModalFade1 ... MatrixModalFadeN ~
+        The trailing gradient applied to each stream, brightest (`Fade1`)
+        to dimmest. One group per entry in `fade_colors`.
+
+==============================================================================
+11. Health                                               *matrix-modal-health*
+
+Run: >vim
+    :checkhealth matrix-modal
+<
+The health check reports:
+
+    - The Neovim version and the availability of |vim.uv| and the
+      floating-window / extmark rendering APIs.
+    - Whether the plugin has loaded and each command is registered.
+    - Whether `require("matrix-modal")` loads and exposes the full API.
+    - Whether |matrix-modal.setup()| has run (highlights survive
+      `:colorscheme` only afterwards).
+    - The resolved configuration (theme, charset size, speed, density,
+      window size, durations, padding, font, fade levels) with range
+      warnings.
+    - Whether each |matrix-modal-highlights| group is defined.
+
+==============================================================================
+12. Notes                                                 *matrix-modal-notes*
+
+    - The grid is one terminal cell per character. Text passed to
+      |:MatrixSay| is sanitized to single-width cells: full-width CJK,
+      emoji, and tabs are replaced with spaces so they cannot shear the
+      layout.
+
+    - Revealed text keeps a `text_padding`-cell rain-free margin around it,
+      so the rain appears to fall behind the message.
+
+    - `font = "block"` renders revealed text from an embedded 5x7 bitmap
+      font with no external dependencies. Text is word-wrapped to the
+      window width; anything still too wide or too tall is clipped, so
+      block mode suits short messages. Only printable ASCII (0x20-0x7E)
+      has glyphs; other characters render as blanks.
+
+    - Only one modal exists at a time. |:Matrix| (or |matrix-modal.start()|)
+      while one is open is a no-op; |:MatrixSay| replaces the current modal.
+
+    - The modal stays centered and re-sized on |VimResized|. A message that
+      has already resolved stays solid across a resize; one still
+      decrypting restarts its reveal at the new size.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
